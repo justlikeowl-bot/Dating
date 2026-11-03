@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Таблиця та Каталог Записів</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .tab-btn.active {
+      border-bottom-color: #3b82f6;
+      color: #2563eb;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <i class="fa-solid fa-table-list text-lg text-white"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg text-slate-900 leading-tight">База Записів</h1>
+            <p class="text-xs text-slate-500">Таблиця та картки з фото</p>
+          </div>
+        </div>
+
+        <!-- View Switcher & Sync -->
+        <div class="flex items-center space-x-4">
+          <div id="syncStatus" class="hidden sm:flex items-center space-x-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span>Автономний режим</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex space-x-8 -mb-px">
+        <button id="tabListBtn" onclick="switchTab('list')" class="tab-btn active py-3 px-1 border-b-2 border-transparent text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center space-x-2">
+          <i class="fa-solid fa-table"></i>
+          <span>Список записів</span>
+          <span id="recordCountBadge" class="ml-1.5 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+        </button>
+        <button id="tabFormBtn" onclick="switchTab('form')" class="tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center space-x-2">
+          <i class="fa-solid fa-plus-circle"></i>
+          <span id="formTabTitle">Додати запис</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- PAGE 1: List View (Default) -->
+    <section id="listView" class="space-y-6">
+      
+      <!-- Toolbar -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 justify-between items-center">
+        <!-- Search -->
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input type="text" id="searchInput" oninput="renderRecords()" placeholder="Пошук за власником, досьє чи описом..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <!-- Filter -->
+          <div class="flex items-center space-x-2 w-full sm:w-auto">
+            <span class="text-xs text-slate-500 font-medium">Враження:</span>
+            <select id="filterImpression" onchange="renderRecords()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+              <option value="all">Усі враження</option>
+              <option value="Відмінно">Відмінно</option>
+              <option value="Позитивно">Позитивно</option>
+              <option value="Нейтрально">Нейтрально</option>
+              <option value="Негативно">Негативно</option>
+              <option value="Потребує уваги">Потребує уваги</option>
+            </select>
+          </div>
+
+          <!-- Mode Toggle (Table / Grid) -->
+          <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button id="viewTableBtn" onclick="setDisplayMode('table')" class="px-3 py-1 text-xs font-semibold rounded-lg bg-white shadow-sm text-slate-700 flex items-center space-x-1">
+              <i class="fa-solid fa-table-cells"></i>
+              <span>Таблиця</span>
+            </button>
+            <button id="viewGridBtn" onclick="setDisplayMode('grid')" class="px-3 py-1 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-700 flex items-center space-x-1">
+              <i class="fa-solid fa-grip"></i>
+              <span>Картки</span>
+            </button>
+          </div>
+
+          <!-- Add Button -->
+          <button onclick="switchTab('form')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm shadow-blue-500/20 flex items-center space-x-2 ml-auto">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Створити</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TABLE CONTAINER -->
+      <div id="tableContainer" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th class="py-3.5 px-4 w-16 text-center">Фото</th>
+                <th class="py-3.5 px-4">Власник</th>
+                <th class="py-3.5 px-4 w-16">Вік</th>
+                <th class="py-3.5 px-4">Досьє</th>
+                <th class="py-3.5 px-4 w-32">Враження</th>
+                <th class="py-3.5 px-4">Сподобалось</th>
+                <th class="py-3.5 px-4">Не сподобалось</th>
+                <th class="py-3.5 px-4 w-24 text-right">Дії</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-sm">
+              <!-- Dynamic Rows inserted here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- GRID CONTAINER (Alternative view) -->
+      <div id="gridContainer" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Dynamic Cards inserted here -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-16 bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+          <i class="fa-solid fa-folder-open text-2xl"></i>
+        </div>
+        <h3 class="text-slate-800 font-semibold text-lg">Записів не знайдено</h3>
+        <p class="text-slate-500 text-sm mt-1 max-w-sm mx-auto">Створіть свій перший запис або змініть параметри пошуку.</p>
+        <button onclick="switchTab('form')" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+          Створити запис
+        </button>
+      </div>
+
+    </section>
+
+    <!-- PAGE 2: Form View -->
+    <section id="formView" class="hidden max-w-2xl mx-auto">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        
+        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div>
+            <h2 id="formHeader" class="text-lg font-bold text-slate-800">Створення нового запису</h2>
+            <p class="text-xs text-slate-500">Заповніть поля для збереження в базу даних</p>
+          </div>
+          <button onclick="cancelEdit()" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg text-sm">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <form id="recordForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-5">
+          <input type="hidden" id="recordId">
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- Власник -->
+            <div class="sm:col-span-2 space-y-1">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Власник *</label>
+              <input type="text" id="fieldOwner" required placeholder="ПІБ або ім'я" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+            </div>
+
+            <!-- Вік -->
+            <div class="space-y-1">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Вік *</label>
+              <input type="number" id="fieldAge" min="0" max="150" required placeholder="28" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+            </div>
+          </div>
+
+          <!-- Досьє (обмеження 50 символів) -->
+          <div class="space-y-1">
+            <div class="flex justify-between items-center">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Досьє *</label>
+              <span class="text-[11px] text-slate-400"><span id="dossierCount">0</span>/50</span>
+            </div>
+            <input type="text" id="fieldDossier" maxlength="50" required oninput="document.getElementById('dossierCount').textContent=this.value.length" placeholder="Коротке ім'я / назва досьє (до 50 символів)" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+          </div>
+
+          <!-- Враження -->
+          <div class="space-y-1">
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Враження *</label>
+            <select id="fieldImpression" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+              <option value="" disabled selected>Оберіть значення...</option>
+              <option value="Відмінно">🌟 Відмінно</option>
+              <option value="Позитивно">👍 Позитивно</option>
+              <option value="Нейтрально">😐 Нейтрально</option>
+              <option value="Негативно">👎 Негативно</option>
+              <option value="Потребує уваги">⚠️ Потребує уваги</option>
+            </select>
+          </div>
+
+          <!-- Сподобалось (до 500 символів) -->
+          <div class="space-y-1">
+            <div class="flex justify-between items-center">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider text-emerald-700">Сподобалось</label>
+              <span class="text-[11px] text-slate-400"><span id="likedCount">0</span>/500</span>
+            </div>
+            <textarea id="fieldLiked" rows="2" maxlength="500" oninput="document.getElementById('likedCount').textContent=this.value.length" placeholder="Що саме сподобалося (до 500 символів)..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"></textarea>
+          </div>
+
+          <!-- Не сподобалось (до 500 символів) -->
+          <div class="space-y-1">
+            <div class="flex justify-between items-center">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider text-rose-700">Не сподобалось</label>
+              <span class="text-[11px] text-slate-400"><span id="dislikedCount">0</span>/500</span>
+            </div>
+            <textarea id="fieldDisliked" rows="2" maxlength="500" oninput="document.getElementById('dislikedCount').textContent=this.value.length" placeholder="Що не сподобалося (до 500 символів)..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
+          </div>
+
+          <!-- Опис (до 2000 символів) -->
+          <div class="space-y-1">
+            <div class="flex justify-between items-center">
+              <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Опис</label>
+              <span class="text-[11px] text-slate-400"><span id="descCount">0</span>/2000</span>
+            </div>
+            <textarea id="fieldDescription" rows="4" maxlength="2000" oninput="document.getElementById('descCount').textContent=this.value.length" placeholder="Детальний опис запису (до 2000 символів)..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+          </div>
+
+          <!-- Фото -->
+          <div class="space-y-1">
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Фотографія</label>
+            <div class="flex items-center gap-4">
+              <div id="imagePreviewContainer" class="w-16 h-16 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                <i id="placeholderIcon" class="fa-solid fa-image text-slate-400 text-lg"></i>
+                <img id="imagePreview" class="w-full h-full object-cover hidden" alt="Прев'ю">
+              </div>
+              <div class="flex-1">
+                <input type="file" id="fieldPhoto" accept="image/*" onchange="handleImagePreview(event)" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+            <button type="button" onclick="cancelEdit()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">Скасувати</button>
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 shadow-sm shadow-blue-500/20 flex items-center space-x-2">
+              <i class="fa-solid fa-check"></i>
+              <span>Зберегти запис</span>
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = { apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: "" };
+    let db = null, isFirebaseActive = false;
+
+    if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        isFirebaseActive = true;
+      } catch (e) {}
+    }
+
+    const DB_NAME = 'RecordsCatalogTableDB_v4', STORE_NAME = 'records';
+
+    function openLocalDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function getLocalRecords() {
+      const db = await openLocalDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+      });
+    }
+
+    async function saveLocalRecord(record) {
+      const db = await openLocalDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(record);
+        tx.oncomplete = () => resolve();
+      });
+    }
+
+    async function deleteLocalRecord(id) {
+      const db = await openLocalDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete(id);
+        tx.oncomplete = () => resolve();
+      });
+    }
+
+    let records = [];
+    let currentBase64Image = '';
+    let displayMode = 'table';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (isFirebaseActive) {
+        const q = query(collection(db, "records"), orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+          records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          renderRecords();
+        });
+      } else {
+        loadOfflineData();
+      }
+    });
+
+    async function loadOfflineData() {
+      records = await getLocalRecords();
+      records.sort((a, b) => b.createdAt - a.createdAt);
+      renderRecords();
+    }
+
+    window.setDisplayMode = function(mode) {
+      displayMode = mode;
+      const tBtn = document.getElementById('viewTableBtn');
+      const gBtn = document.getElementById('viewGridBtn');
+      if (mode === 'table') {
+        tBtn.className = "px-3 py-1 text-xs font-semibold rounded-lg bg-white shadow-sm text-slate-700 flex items-center space-x-1";
+        gBtn.className = "px-3 py-1 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-700 flex items-center space-x-1";
+      } else {
+        gBtn.className = "px-3 py-1 text-xs font-semibold rounded-lg bg-white shadow-sm text-slate-700 flex items-center space-x-1";
+        tBtn.className = "px-3 py-1 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-700 flex items-center space-x-1";
+      }
+      renderRecords();
+    };
+
+    window.switchTab = function(tabName) {
+      const listView = document.getElementById('listView');
+      const formView = document.getElementById('formView');
+      const tabListBtn = document.getElementById('tabListBtn');
+      const tabFormBtn = document.getElementById('tabFormBtn');
+
+      if (tabName === 'list') {
+        listView.classList.remove('hidden');
+        formView.classList.add('hidden');
+        tabListBtn.classList.add('active');
+        tabFormBtn.classList.remove('active');
+      } else {
+        listView.classList.add('hidden');
+        formView.classList.remove('hidden');
+        tabFormBtn.classList.add('active');
+        tabListBtn.classList.remove('active');
+      }
+    };
+
+    window.renderRecords = function() {
+      const tableContainer = document.getElementById('tableContainer');
+      const gridContainer = document.getElementById('gridContainer');
+      const tbody = document.getElementById('recordsTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+      const filterImpression = document.getElementById('filterImpression').value;
+
+      const filtered = records.filter(r => {
+        const matchesSearch = (r.owner || '').toLowerCase().includes(searchQuery) || 
+                              (r.dossier || '').toLowerCase().includes(searchQuery) ||
+                              (r.description || '').toLowerCase().includes(searchQuery);
+        const matchesImpression = filterImpression === 'all' || r.impression === filterImpression;
+        return matchesSearch && matchesImpression;
+      });
+
+      document.getElementById('recordCountBadge').textContent = records.length;
+
+      if (filtered.length === 0) {
+        tableContainer.classList.add('hidden');
+        gridContainer.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      const badgeStyles = {
+        'Відмінно': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'Позитивно': 'bg-blue-50 text-blue-700 border-blue-200',
+        'Нейтрально': 'bg-slate-100 text-slate-700 border-slate-200',
+        'Негативно': 'bg-rose-50 text-rose-700 border-rose-200',
+        'Потребує уваги': 'bg-amber-50 text-amber-700 border-amber-200'
+      };
+
+      if (displayMode === 'table') {
+        tableContainer.classList.remove('hidden');
+        gridContainer.classList.add('hidden');
+
+        tbody.innerHTML = filtered.map(r => {
+          const badgeClass = badgeStyles[r.impression] || 'bg-slate-100 text-slate-700 border-slate-200';
+          const imgHtml = r.photo ? `<img src="${r.photo}" class="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-200">` : `<div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 mx-auto border border-slate-200"><i class="fa-solid fa-image text-xs"></i></div>`;
+
+          return `
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="py-3 px-4 text-center">${imgHtml}</td>
+              <td class="py-3 px-4 font-semibold text-slate-900">${escapeHtml(r.owner)}</td>
+              <td class="py-3 px-4 text-slate-600">${r.age} р.</td>
+              <td class="py-3 px-4 text-slate-700 font-medium max-w-[150px] truncate" title="${escapeHtml(r.dossier)}">${escapeHtml(r.dossier)}</td>
+              <td class="py-3 px-4">
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full border ${badgeClass}">
+                  ${r.impression}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-emerald-700 max-w-[150px] truncate" title="${escapeHtml(r.liked || '')}">${escapeHtml(r.liked || '-')}</td>
+              <td class="py-3 px-4 text-rose-700 max-w-[150px] truncate" title="${escapeHtml(r.disliked || '')}">${escapeHtml(r.disliked || '-')}</td>
+              <td class="py-3 px-4 text-right">
+                <button onclick="editRecord('${r.id}')" class="p-1.5 hover:bg-slate-200/60 rounded-lg text-slate-600 transition-colors mr-1" title="Редагувати">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button onclick="deleteRecord('${r.id}')" class="p-1.5 hover:bg-rose-50 rounded-lg text-rose-600 transition-colors" title="Видалити">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tableContainer.classList.add('hidden');
+        gridContainer.classList.remove('hidden');
+
+        gridContainer.innerHTML = filtered.map(r => {
+          const badgeClass = badgeStyles[r.impression] || 'bg-slate-100 text-slate-700 border-slate-200';
+          const photoUrl = r.photo || 'https://via.placeholder.com/400x300?text=%D0%91%D0%B5%D0%B7+%D1%84%D0%BE%D1%82%D0%BE';
+          return `
+            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+              <div>
+                <div class="relative h-44 bg-slate-100 overflow-hidden">
+                  <img src="${photoUrl}" class="w-full h-full object-cover">
+                  <span class="absolute top-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-full border ${badgeClass} backdrop-blur-md bg-white/90">
+                    ${r.impression}
+                  </span>
+                </div>
+                <div class="p-4 space-y-3">
+                  <div>
+                    <h3 class="font-bold text-slate-900">${escapeHtml(r.owner)} <span class="text-xs font-normal text-slate-500">(${r.age} років)</span></h3>
+                    <p class="text-xs text-blue-600 font-semibold mt-0.5">Досьє: ${escapeHtml(r.dossier)}</p>
+                  </div>
+                  
+                  ${r.liked ? `<div class="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 text-xs text-emerald-800"><strong>👍 Сподобалось:</strong> ${escapeHtml(r.liked)}</div>` : ''}
+                  ${r.disliked ? `<div class="bg-rose-50 p-2.5 rounded-lg border border-rose-100 text-xs text-rose-800"><strong>👎 Не сподобалось:</strong> ${escapeHtml(r.disliked)}</div>` : ''}
+                  ${r.description ? `<div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs text-slate-600 whitespace-pre-line"><strong>Опис:</strong> ${escapeHtml(r.description)}</div>` : ''}
+                </div>
+              </div>
+              <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
+                <span>${new Date(r.createdAt).toLocaleDateString('uk-UA')}</span>
+                <div>
+                  <button onclick="editRecord('${r.id}')" class="p-1 hover:text-slate-700 mr-2"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button onclick="deleteRecord('${r.id}')" class="p-1 hover:text-rose-600"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    };
+
+    window.handleImagePreview = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        currentBase64Image = evt.target.result;
+        const imgEl = document.getElementById('imagePreview');
+        imgEl.src = currentBase64Image;
+        imgEl.classList.remove('hidden');
+        document.getElementById('placeholderIcon').classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.handleFormSubmit = async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('recordId').value;
+      const owner = document.getElementById('fieldOwner').value;
+      const age = parseInt(document.getElementById('fieldAge').value, 10);
+      const dossier = document.getElementById('fieldDossier').value;
+      const impression = document.getElementById('fieldImpression').value;
+      const liked = document.getElementById('fieldLiked').value;
+      const disliked = document.getElementById('fieldDisliked').value;
+      const description = document.getElementById('fieldDescription').value;
+
+      const recordData = {
+        owner, age, dossier, impression, liked, disliked, description,
+        photo: currentBase64Image || (id ? (records.find(r => r.id === id)?.photo || '') : ''),
+        createdAt: id ? (records.find(r => r.id === id)?.createdAt || Date.now()) : Date.now()
+      };
+
+      if (isFirebaseActive) {
+        if (id) await updateDoc(doc(db, "records", id), recordData);
+        else await addDoc(collection(db, "records"), recordData);
+      } else {
+        const recordId = id || 'rec_' + Date.now();
+        await saveLocalRecord({ id: recordId, ...recordData });
+        await loadOfflineData();
+      }
+
+      resetForm();
+      switchTab('list');
+    };
+
+    window.editRecord = function(id) {
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+
+      document.getElementById('recordId').value = record.id;
+      document.getElementById('fieldOwner').value = record.owner;
+      document.getElementById('fieldAge').value = record.age;
+      document.getElementById('fieldDossier').value = record.dossier || '';
+      document.getElementById('dossierCount').textContent = (record.dossier || '').length;
+
+      document.getElementById('fieldImpression').value = record.impression;
+
+      document.getElementById('fieldLiked').value = record.liked || '';
+      document.getElementById('likedCount').textContent = (record.liked || '').length;
+
+      document.getElementById('fieldDisliked').value = record.disliked || '';
+      document.getElementById('dislikedCount').textContent = (record.disliked || '').length;
+
+      document.getElementById('fieldDescription').value = record.description || '';
+      document.getElementById('descCount').textContent = (record.description || '').length;
+
+      currentBase64Image = record.photo || '';
+      if (currentBase64Image) {
+        const imgEl = document.getElementById('imagePreview');
+        imgEl.src = currentBase64Image;
+        imgEl.classList.remove('hidden');
+        document.getElementById('placeholderIcon').classList.add('hidden');
+      }
+
+      document.getElementById('formHeader').textContent = 'Редагування запису';
+      document.getElementById('formTabTitle').textContent = 'Редагувати запис';
+      switchTab('form');
+    };
+
+    window.deleteRecord = async function(id) {
+      if (!confirm('Видалити цей запис?')) return;
+      if (isFirebaseActive) await deleteDoc(doc(db, "records", id));
+      else {
+        await deleteLocalRecord(id);
+        await loadOfflineData();
+      }
+    };
+
+    window.cancelEdit = function() {
+      resetForm();
+      switchTab('list');
+    };
+
+    function resetForm() {
+      document.getElementById('recordForm').reset();
+      document.getElementById('recordId').value = '';
+      currentBase64Image = '';
+      document.getElementById('dossierCount').textContent = '0';
+      document.getElementById('likedCount').textContent = '0';
+      document.getElementById('dislikedCount').textContent = '0';
+      document.getElementById('descCount').textContent = '0';
+      document.getElementById('imagePreview').classList.add('hidden');
+      document.getElementById('placeholderIcon').classList.remove('hidden');
+      document.getElementById('formHeader').textContent = 'Створення нового запису';
+      document.getElementById('formTabTitle').textContent = 'Додати запис';
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
